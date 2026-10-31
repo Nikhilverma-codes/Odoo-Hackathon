@@ -22,7 +22,7 @@
 
 	let sidebarOpen = $state(false);
 	let pathname = $derived(page.url.pathname);
-	let sections = $derived(sectionsFor(auth.role));
+	let sections = $derived(sectionsFor(auth.role, auth.isAdmin));
 	let title = $derived(titleFor(pathname));
 	let user = $derived(auth.user);
 	let company = $derived(
@@ -51,7 +51,7 @@
 	}
 </script>
 
-<div class="min-h-screen bg-slate-50">
+<div class="min-h-screen bg-stone-50">
 	{#if sidebarOpen}
 		<button
 			type="button"

@@ -1,5 +1,7 @@
 export type Role = 'admin' | 'customer';
 
+export type SystemRole = 'admin' | 'staff' | 'customer';
+
 export type BillingPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export type SubscriptionStatus =
@@ -19,6 +21,7 @@ export interface User {
 	email: string;
 	password: string;
 	role: Role;
+	systemRole: SystemRole;
 	customerId: string | null;
 	active: boolean;
 	createdAt: string;

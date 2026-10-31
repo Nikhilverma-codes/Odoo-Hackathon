@@ -5,10 +5,18 @@ import {
 	PRODUCT_TYPE_TO_BACKEND,
 	type RawCustomer,
 	type RawPlan,
-	type RawProduct
+	type RawProduct,
+	type RawUser
 } from './backend';
 import { db } from './store.svelte';
-import type { Customer, Plan, Product, ProductVariant } from './types';
+import type {
+	Customer,
+	Plan,
+	Product,
+	ProductVariant,
+	SystemRole,
+	User
+} from './types';
 
 /**
  * Write-side repository for the FastAPI backend.
@@ -26,6 +34,14 @@ function numericId(value: string | null | undefined): number | null {
 function dateOrNull(value: string): string | null {
 	return value.trim() ? value : null;
 }
+
+type CustomerInput = Omit<Customer, 'id'> & { portalPassword?: string };
+type TeamMemberInput = {
+	name: string;
+	email: string;
+	password: string;
+	role: Exclude<SystemRole, 'customer'>;
+};
 
 export async function refreshWorkspace(): Promise<void> {
 	const role = auth.role;
@@ -209,7 +225,7 @@ const customers = {
 	async get(id: string): Promise<Customer | null> {
 		return db.data.customers.find((customer) => customer.id === id) ?? null;
 	},
-	async create(input: Omit<Customer, 'id'>): Promise<Customer> {
+	async create(input: CustomerInput): Promise<Customer> {
 		const created = await apiRequest<RawCustomer>('/customers', {
 			method: 'POST',
 			body: {
@@ -217,7 +233,8 @@ const customers = {
 				contact_name: input.name.trim() || null,
 				email: input.email.trim().toLowerCase(),
 				phone: input.phone.trim() || null,
-				billing_address: input.address.trim() || null
+				billing_address: input.address.trim() || null,
+				portal_password: input.portalPassword?.trim() || null
 			}
 		});
 		await refreshWorkspace();

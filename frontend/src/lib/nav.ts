@@ -5,6 +5,7 @@ export interface NavItem {
 	href: string;
 	icon: string;
 	roles: Role[];
+	adminOnly?: boolean;
 }
 
 export interface NavSection {
@@ -29,6 +30,12 @@ export const NAV_SECTIONS: NavSection[] = [
 		]
 	},
 	{
+		title: 'Administration',
+		items: [
+			{ label: 'Team', href: '/staff', icon: 'users', roles: ['admin'], adminOnly: true }
+		]
+	},
+	{
 		title: 'My services',
 		items: [
 			{ label: 'Overview', href: '/portal', icon: 'grid', roles: ['customer'] },
@@ -43,11 +50,13 @@ export const NAV_SECTIONS: NavSection[] = [
 	}
 ];
 
-export function sectionsFor(role: Role | null): NavSection[] {
+export function sectionsFor(role: Role | null, isAdmin = false): NavSection[] {
 	if (!role) return [];
 	return NAV_SECTIONS.map((section) => ({
 		...section,
-		items: section.items.filter((item) => item.roles.includes(role))
+		items: section.items.filter(
+			(item) => item.roles.includes(role) && (!item.adminOnly || isAdmin)
+		)
 	})).filter((section) => section.items.length > 0);
 }
 

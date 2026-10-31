@@ -219,6 +219,7 @@ export function mapUser(raw: RawUser): User {
 		email: raw.email,
 		password: '',
 		role,
+		systemRole: raw.role,
 		customerId: raw.customer_id == null ? null : sid(raw.customer_id),
 		active: raw.is_active,
 		createdAt: raw.created_at

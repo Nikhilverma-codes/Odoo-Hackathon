@@ -54,6 +54,10 @@ export const auth = {
 		return user?.role ?? null;
 	},
 
+	get isAdmin(): boolean {
+		return user?.systemRole === 'admin';
+	},
+
 	get isAuthenticated(): boolean {
 		return user !== null && getToken() !== null;
 	},
@@ -138,7 +142,12 @@ export const auth = {
 			});
 			setToken(result.token.access_token);
 			const next = mapUser(result.user);
-			await hydrate(next);
+			try {
+				await hydrate(next);
+			} catch (error) {
+				clearToken();
+				throw error;
+			}
 			user = next;
 			persistUser(next);
 			ready = true;
