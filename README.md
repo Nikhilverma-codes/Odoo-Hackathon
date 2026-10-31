@@ -62,6 +62,55 @@ customers, subscriptions and billing history. Set `SEED_DEMO_DATA=false` to
 disable it. When `frontend/build` is missing, the API still runs; `/` returns
 the JSON service index instead of the SPA.
 
+## Deploy to Vercel
+
+The repository deploys as a single Vercel project. Vercel detects the FastAPI
+app at `app/main.py`; `vercel.json` builds the Svelte SPA into `frontend/build`
+before deployment, and FastAPI serves it. Files under `/_app` are promoted to
+Vercel's CDN.
+
+1. Import the repository at <https://vercel.com/new>, or run `npx vercel` from
+   the project root.
+2. Keep the repository root as the project root and let Vercel detect the
+   **FastAPI** framework.
+3. Add the environment variables below.
+4. Deploy. Builds run `npm --prefix frontend ci && npm --prefix frontend run
+   build`; the API function gets 60 seconds and 1 GB, which covers the billing
+   run.
+
+| Variable | Value |
+| --- | --- |
+| `SECRET_KEY` | 32+ random characters (`python -c "import secrets; print(secrets.token_urlsafe(48))"`) |
+| `ENVIRONMENT` | `production` (rejects the default secret; hides reset tokens) |
+| `DATABASE_URL` | `postgresql+psycopg://USER:PASSWORD@HOST/DB?sslmode=require` for durable data |
+| `SEED_DEMO_DATA` | `true` for a demo deployment, `false` once real data exists |
+| `FRONTEND_URL` | `https://your-project.vercel.app`, used in password-reset links |
+| `CORS_ORIGINS` | Only needed when the SPA is served from another origin |
+
+### Database and filesystem on Vercel
+
+Vercel Functions have a read-only filesystem except `/tmp`, and that storage is
+not shared between instances. When `DATABASE_URL` is left on SQLite, the app
+automatically moves the file to `/tmp/brightloop.db` so previews still boot; the
+demo data is re-seeded on each cold start and is **not durable**.
+
+For a persistent deployment, point `DATABASE_URL` at Postgres (Vercel Postgres,
+Neon, Supabase, ...). Tables are created on first boot and `psycopg` is already
+in `requirements.txt`. Keep `SEED_DEMO_DATA=true` for the first deploy so an
+admin account exists; the seed step is skipped as soon as
+`admin@brightloop.io` is present.
+
+### Frontend-only deployment
+
+To host the SPA on Vercel and the API elsewhere, set the Vercel project root to
+`frontend/`, build with `npm run build`, and set
+`VITE_API_BASE_URL=https://your-api.example.com/api/v1` in the build
+environment. Add the Vercel origin to the backend's `CORS_ORIGINS`.
+
+To run billing on a schedule, call `POST /api/v1/invoices/run-billing` from an
+external scheduler (or a Vercel Cron route that wraps it); the operation is
+idempotent and safe to retry.
+
 ## Demo accounts
 
 | Role | Email | Password |
@@ -195,6 +244,7 @@ frontend/
 docs/architecture.md      Mermaid architecture, ER and flow diagrams
 tests/                    backend test suite
 scripts/demo.ps1          build + serve demo launcher
+vercel.json               Vercel build command and function settings
 ```
 
 ## Production notes

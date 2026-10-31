@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -57,6 +58,25 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SECRET_KEY must be a random value of at least 32 characters in production"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _use_writable_sqlite_on_vercel(self) -> "Settings":
+        """Keep SQLite usable on Vercel's read-only, per-instance filesystem.
+
+        Vercel only allows writes under /tmp, and that storage is not shared
+        between function instances. Point DATABASE_URL at Postgres for durable
+        data; this fallback keeps preview deployments working with an ephemeral
+        database that is rebuilt on each cold start.
+        """
+        if (
+            os.getenv("VERCEL")
+            and os.name == "posix"
+            and self.is_sqlite
+            and ":memory:" not in self.database_url
+        ):
+            filename = self.database_url.rsplit("/", 1)[-1] or "brightloop.db"
+            self.database_url = f"sqlite:////tmp/{filename}"
         return self
 
     @property
