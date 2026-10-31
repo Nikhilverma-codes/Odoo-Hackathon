@@ -17,6 +17,7 @@
 	import StatusBadge from '#lib/components/ui/StatusBadge.svelte';
 	import Table from '#lib/components/ui/Table.svelte';
 	import PaymentModal from '#lib/components/PaymentModal.svelte';
+	import RunBillingModal from '#lib/components/RunBillingModal.svelte';
 	import { formatDate, relativeDays } from '#lib/utils/date';
 	import { currency, titleCase } from '#lib/utils/format';
 
@@ -31,6 +32,7 @@
 
 	let paymentOpen = $state(false);
 	let paymentTarget = $state<Invoice | null>(null);
+	let billingOpen = $state(false);
 
 	let summary = $derived(metrics(db.data));
 
@@ -94,9 +96,13 @@
 				<Icon name="wallet" size={16} />
 				Payments
 			</Button>
-			<Button href="/subscriptions">
+			<Button variant="outline" href="/subscriptions">
 				<Icon name="receipt" size={16} />
 				Bill a subscription
+			</Button>
+			<Button onclick={() => (billingOpen = true)}>
+				<Icon name="play" size={16} />
+				Run billing
 			</Button>
 		{/snippet}
 	</PageHeader>
@@ -246,3 +252,5 @@
 	onclose={() => (paymentOpen = false)}
 	onrecorded={() => (paymentTarget = null)}
 />
+
+<RunBillingModal open={billingOpen} onclose={() => (billingOpen = false)} />

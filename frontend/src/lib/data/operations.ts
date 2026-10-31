@@ -2,13 +2,7 @@ import { apiRequest } from './api-client';
 import { refreshWorkspace } from './api';
 import type { RawInvoice, RawSubscription } from './backend';
 import { db } from './store.svelte';
-import type {
-	Invoice,
-	Payment,
-	PaymentMethod,
-	Subscription,
-	SubscriptionStatus
-} from './types';
+import type { Invoice, Payment, PaymentMethod, Subscription, SubscriptionStatus } from './types';
 import { paymentTermsDays } from '#lib/utils/date';
 
 export const SUBSCRIPTION_FLOW: SubscriptionStatus[] = [
@@ -113,6 +107,66 @@ export async function generateInvoice(
 		const invoice = db.data.invoices.find((item) => item.id === String(raw.id));
 		if (!invoice) throw new Error('The invoice was saved but could not be reloaded.');
 		return { ok: true, invoice };
+	} catch (error) {
+		return { ok: false, error: messageOf(error) };
+	}
+}
+
+export interface BillingRunResult {
+	asOf: string;
+	dryRun: boolean;
+	scanned: number;
+	invoiced: number;
+	skipped: number;
+	closed: number;
+	invoiceIds: string[];
+	invoiceNumbers: string[];
+	errors: string[];
+}
+
+interface RawBillingRun {
+	as_of: string;
+	dry_run: boolean;
+	scanned: number;
+	invoiced: number;
+	skipped: number;
+	closed: number;
+	invoice_ids: number[];
+	invoice_numbers: string[];
+	errors: string[];
+}
+
+export async function runBilling(input: {
+	asOf: string;
+	autoConfirm: boolean;
+	dryRun?: boolean;
+}): Promise<{ ok: true; result: BillingRunResult } | { ok: false; error: string }> {
+	try {
+		const raw = await apiRequest<RawBillingRun>('/invoices/run-billing', {
+			method: 'POST',
+			body: {
+				as_of: input.asOf,
+				auto_confirm: input.autoConfirm,
+				dry_run: input.dryRun ?? false
+			}
+		});
+		if (!input.dryRun) {
+			await refreshWorkspace();
+		}
+		return {
+			ok: true,
+			result: {
+				asOf: raw.as_of,
+				dryRun: raw.dry_run,
+				scanned: raw.scanned,
+				invoiced: raw.invoiced,
+				skipped: raw.skipped,
+				closed: raw.closed,
+				invoiceIds: raw.invoice_ids.map(String),
+				invoiceNumbers: raw.invoice_numbers,
+				errors: raw.errors
+			}
+		};
 	} catch (error) {
 		return { ok: false, error: messageOf(error) };
 	}

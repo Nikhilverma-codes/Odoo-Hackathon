@@ -1,283 +1,178 @@
-# Brightloop — Subscription Management API
+# Brightloop
 
-Backend scaffold for the **Subscription Management System** brief: products and
-variants, plans, quotation templates, subscriptions, automated invoicing, taxes,
-discounts, payments and finance reporting — built with **FastAPI + SQLAlchemy 2 +
-SQLite**.
+Brightloop is a full-stack subscription billing system built for the Odoo
+hackathon brief. It covers the catalogue, plans, quotations, subscription
+lifecycle, recurring invoices, taxes, discounts, payments, finance reporting and
+a customer self-service portal.
 
-The domain model follows the four scenes in the brief (signup, launching a plan,
-billing day, discounts/payments/reporting) rather than a generic CRUD skeleton.
+The backend is FastAPI + SQLAlchemy 2 + SQLite. The frontend is SvelteKit 5 with
+Svelte runes, Tailwind CSS and a static SPA build served by FastAPI.
 
----
+## Quick start
 
-## Quickstart
+Prerequisites: Python 3.11+, Node.js 20+.
 
 ```powershell
-# from the repo root
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-# optional: customise settings (defaults work out of the box)
-Copy-Item .env.example .env
-
-uvicorn app.main:app --reload
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+npm --prefix frontend ci
 ```
 
-* Swagger UI: <http://127.0.0.1:8000/docs>
-* ReDoc: <http://127.0.0.1:8000/redoc>
-* Health: <http://127.0.0.1:8000/health>
+### One command demo
 
-On first boot the app creates `brightloop.db` and seeds a demo month of data
-(disable with `SEED_DEMO_DATA=false`).
+```powershell
+.\scripts\demo.ps1
+```
 
-### Demo accounts
+This builds the frontend, starts FastAPI and serves the app at
+<http://127.0.0.1:8000>. Add `-SkipBuild` to reuse the existing frontend build.
+
+### Development mode
+
+Run the API and Vite in separate terminals:
+
+```powershell
+# terminal 1
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+
+# terminal 2
+npm --prefix frontend run dev
+```
+
+Open <http://localhost:5173>. Vite proxies `/api` to the backend on port 8000.
+Swagger remains available at <http://127.0.0.1:8000/docs>.
+
+On first boot the app creates `brightloop.db` and seeds a demo catalogue,
+customers, subscriptions and billing history. Set `SEED_DEMO_DATA=false` to
+disable it.
+
+## Demo accounts
 
 | Role | Email | Password |
 | --- | --- | --- |
 | Admin | `admin@brightloop.io` | `Admin@1234` |
-| Staff (sales) | `sales@brightloop.io` | `Staff@1234` |
+| Staff | `sales@brightloop.io` | `Staff@1234` |
 | Customer (Acme) | `billing@acme-retail.com` | `Customer@1234` |
 | Customer (Northwind) | `finance@northwind.com` | `Customer@1234` |
 
-### Try the billing month
+Admin sees the full workspace. Staff gets the same operational screens without
+staff-management access. Customers only see their own subscriptions, invoices
+and payments.
 
-```powershell
-$token = (Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/auth/login `
-  -ContentType 'application/json' `
-  -Body '{"email":"admin@brightloop.io","password":"Admin@1234"}').token.access_token
+## Demo walkthrough
 
-$h = @{ Authorization = "Bearer $token" }
+1. Sign in as the admin and open **Invoices**.
+2. Choose **Run billing**.
+3. Select **Next 30 days**, then **Preview**. The preview is a dry run and writes
+   nothing.
+4. Keep **Issue invoices immediately** enabled and choose **Run billing**.
+5. Open one of the generated invoices and record a full or partial payment.
+6. Sign out and sign in as the Acme customer to see the same invoice in the
+   portal.
+7. Sign in as staff to confirm the operational workspace and restricted
+   staff-management access.
 
-# finance view
-Invoke-RestMethod http://127.0.0.1:8000/api/v1/reports/summary -Headers $h
+The seeded dataset is already billed through roughly the current date, so
+running billing for today may legitimately produce zero invoices. Use a future
+date to demonstrate the next billing cycle.
 
-# bill every due subscription (idempotent)
-Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/invoices/run-billing `
-  -Headers $h -ContentType 'application/json' `
-  -Body '{"as_of":"2026-10-31","auto_confirm":true}'
-```
+## Billing behavior
 
----
+- `POST /api/v1/invoices/run-billing` selects active subscriptions whose
+  `next_billing_date` is on or before `as_of`.
+- Each due period is invoiced once. Missed periods are caught up in order, capped
+  at 60 periods per run.
+- A unique constraint on `(subscription_id, period_start)` and the billing
+  cursor make retries and repeated runs safe.
+- `dry_run: true` returns the due counts without writing invoices.
+- `auto_confirm: false` creates draft invoices for review.
+- Invoice totals are computed per line: quantity, unit price, discount, tax and
+  total. Tax rates and lifecycle settings are snapshotted so later catalogue
+  changes do not rewrite history.
+- Subscriptions close automatically at term end when the plan allows it,
+  otherwise billing stops for a human decision.
+- Payments may be partial. An invoice becomes `paid` when payments cover the
+  total; overpayments are rejected.
 
-## Stack
-
-| Concern | Choice |
-| --- | --- |
-| Web framework | FastAPI (sync SQLAlchemy sessions, async-ready) |
-| ORM | SQLAlchemy 2.0 (`Mapped` / `mapped_column`) |
-| Database | SQLite, WAL mode, foreign keys enforced |
-| Validation | Pydantic v2 + pydantic-settings |
-| Auth | JWT access tokens (PyJWT) + PBKDF2-SHA256 password hashing |
-| Tests | pytest + FastAPI TestClient, in-memory SQLite |
-
-Money is stored as **integer cents** through a `Money` type decorator and always
-handled as `Decimal` in Python, so no float rounding drifts into invoices. Tax
-rates are stored as basis points via a `Rate` decorator.
-
----
-
-## Project layout
-
-```
-app/
-  main.py                 app factory, lifespan, CORS, error handlers
-  core/
-    config.py             pydantic-settings (reads .env)
-    security.py           hashing, password policy, JWT, reset tokens
-    money.py              Decimal helpers + proportional allocation
-  db/
-    base.py               Base, Money/Rate types, utcnow, enum helper
-    session.py            engine, session factory, get_db, SQLite PRAGMAs
-    seed.py               demo data for one billing month
-  models/                 user, product, plan, quotation, subscription,
-                          discount, invoice
-  schemas/                request/response models, pagination envelope
-  services/
-    subscriptions.py      state machine, line pricing, renewals
-    billing.py            period math, discount engine, invoice run
-    invoices.py           confirm/cancel/send, payments, printable HTML
-    reporting.py          MRR, revenue series, overdue
-    numbering.py          SUB/YYYY/NNNNN and INV/YYYY/NNNNN
-    email.py              pluggable email seam (logs in dev)
-  api/
-    deps.py               auth, role guards, pagination, tenant scoping
-    v1/                   routers: auth, users, customers, taxes, products,
-                          plans, quotation-templates, discounts,
-                          subscriptions, invoices, payments, reports
-tests/                    auth, billing/discount/payment, lifecycle tests
-```
-
----
-
-## Domain model
-
-```
-Customer 1─* User            (portal logins; one email = one account)
-Customer 1─* Subscription *─1 Plan *─1 Product 1─* ProductVariant
-                        │           └─1 Tax
-                        ├─* SubscriptionLine *─1 Product / Variant / Tax
-                        ├─* SubscriptionDiscount *─1 Discount
-                        └─1 QuotationTemplate
-
-Subscription 1─* Invoice 1─* InvoiceLine
-                        └─* Payment
-Discount 1─* DiscountRedemption
-```
-
-Key fields:
-
-* **Product** — name, type, sales/cost price, notes, default tax, variants with
-  `price_delta` (e.g. *Odoo brand* adds 560).
-* **Plan** — price, interval (`daily|weekly|monthly|yearly`), minimum quantity,
-  availability window, and the four lifecycle switches (`auto_close_on_expiry`,
-  `allow_early_close`, `allow_pause`, `allow_renew`). Those switches are
-  **snapshotted** onto the subscription so changing a plan later does not
-  rewrite history.
-* **Subscription** — number, customer, plan, start/expiry dates, payment terms,
-  lines, discount links, billing cursor (`current_period_start/end`,
-  `next_billing_date`), and a full status history.
-* **Invoice** — number, customer, period, totals (`subtotal`, `discount_total`,
-  `tax_total`, `total`, `amount_paid`), status, and an `amount_due` / `is_overdue`
-  pair derived from those numbers.
-* **Payment** — method, amount, date, reference and note, always against an
-  invoice.
-
-Statuses: `draft → quotation → confirmed → active → paused → closed`, enforced by
-a transition map in `app/models/subscription.py`. Closing early is refused when
-the plan forbids it.
-
----
-
-## How billing works
-
-1. Activating a subscription anchors the cursor on its start date.
-2. `POST /api/v1/invoices/run-billing` selects every **active** subscription with
-   `next_billing_date <= as_of` and bills each period in order, looping so missed
-   months are caught up (capped at 60 periods per run).
-3. Invoice numbers and lines are generated from the subscription: customer,
-   products, quantities, unit prices, tax rates, discounts and totals.
-4. A unique constraint on `(subscription_id, period_start)` makes double billing
-   impossible even under concurrent runs. `dry_run` lets you preview the run.
-5. After invoicing, the cursor moves forward. When the next period would start
-   after `expiry_date`, the subscription closes automatically if the plan allows
-   it; otherwise billing stops and a human decides.
-
-Amounts are calculated per line:
-
-```
-line_subtotal   = quantity × unit_price
-line_discount   = discount rules matching the line (product or subscription scope)
-line_tax        = (line_subtotal − line_discount) × tax_rate
-line_total      = line_subtotal − line_discount + line_tax
-invoice_total   = Σ line_total
-```
-
-* **Taxes** live on the product (or plan) and are copied onto subscription and
-  invoice lines, so a rate change never rewrites past invoices.
-* **Discounts** are created by admins only, then attached to a subscription.
-  Every invoice re-checks the start/end dates, `min_purchase_amount`,
-  `min_quantity` and `max_uses`. A use is consumed only when the invoice is
-  confirmed; once the limit is reached the discount silently stops applying.
-  Percentage and fixed amounts are both capped at the eligible subtotal.
-* **Payments** can be partial; the invoice flips to `paid` when the sum of
-  payments covers the total, and overpayments are rejected.
-
-A single subscription can also be billed on demand:
+The same flow can be triggered for one subscription with
 `POST /api/v1/subscriptions/{id}/invoices`.
 
----
-
-## API surface
+## Main API areas
 
 All routes are under `/api/v1` and require a bearer token unless noted.
 
 | Area | Endpoints |
 | --- | --- |
-| Auth | `POST /auth/register`, `/auth/login`, `/auth/token`, `/auth/forgot-password`, `/auth/reset-password`, `GET /auth/me`, `POST /auth/me/password` |
-| Users | `GET /users`, `POST /users/staff` *(admin)*, `GET|PATCH /users/{id}` *(admin)* |
-| Customers | `GET /customers`, `POST /customers`, `GET /customers/me`, `GET|PATCH /customers/{id}` |
-| Taxes | `GET /taxes`, `POST|PATCH|DELETE /taxes/{id}` *(admin writes)* |
-| Products | `GET|POST /products`, `GET|PATCH|DELETE /products/{id}`, `POST /products/{id}/variants`, `PATCH|DELETE /products/variants/{id}` |
-| Plans | `GET|POST /plans`, `GET|PATCH|DELETE /plans/{id}` |
-| Quotation templates | `GET|POST /quotation-templates`, `GET|DELETE /quotation-templates/{id}` *(staff)* |
-| Discounts | `GET|POST /discounts`, `GET|PATCH|DELETE /discounts/{id}` *(admin writes)* |
-| Subscriptions | `GET|POST /subscriptions`, `GET|PATCH /subscriptions/{id}`, `POST .../status`, `.../confirm`, `.../activate`, `.../pause`, `.../resume`, `.../close`, `.../renew`, `.../discounts`, `GET|POST .../invoices` |
-| Invoices | `GET|POST /invoices`, `POST /invoices/run-billing`, `GET|PATCH /invoices/{id}`, `POST .../confirm`, `.../cancel`, `.../send`, `.../payments`, `GET .../print` |
-| Payments | `GET /payments`, `GET /payments/{id}`, `GET /payments/{id}/invoice` |
-| Reports | `GET /reports/summary`, `/reports/revenue?group_by=month|day`, `/reports/overdue` |
+| Auth | `/auth/login`, `/auth/register`, `/auth/me`, password reset/change |
+| Customers | `/customers`, `/customers/me`, customer detail/update |
+| Catalogue | `/taxes`, `/products`, product variants, `/plans` |
+| Sales | `/quotation-templates`, `/discounts`, `/subscriptions` |
+| Billing | `/invoices`, `/invoices/run-billing`, invoice actions, `/payments` |
+| Reporting | `/reports/summary`, `/reports/revenue`, `/reports/overdue` |
 
-List endpoints accept `page` / `page_size` and return:
+List endpoints return `{ "items": [], "total": 0, "page": 1, "page_size": 20,
+"pages": 0 }` and support pagination plus area-specific filters.
 
-```json
-{ "items": [], "total": 0, "page": 1, "page_size": 20, "pages": 0 }
-```
+## Configuration
 
-Useful filters: subscriptions by `status`, `customer_id`, `plan_id`,
-`expiring_before`, `q` (number or customer name); invoices by `status`,
-`overdue`, `date_from`/`date_to`, `subscription_id`, `q`.
+Copy `.env.example` to `.env` when you need to override defaults.
 
----
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ENVIRONMENT` | `development` | Set to `production` for production checks |
+| `SECRET_KEY` | dev value | JWT signing key; production requires 32+ random characters |
+| `DATABASE_URL` | `sqlite:///./brightloop.db` | Database connection |
+| `CORS_ORIGINS` | localhost:3000, localhost:5173 | Comma-separated browser origins |
+| `FRONTEND_URL` | `http://localhost:5173` | Password-reset link base |
+| `SEED_DEMO_DATA` | `true` | Seed demo data on first boot |
+| `SERVE_FRONTEND` | `true` | Serve the built SPA from FastAPI |
+| `FRONTEND_BUILD_DIR` | `frontend/build` | Static build directory |
 
-## Access control
+In production, set a random `SECRET_KEY` and a real `DATABASE_URL`. Startup
+rejects the default or short secret when `ENVIRONMENT=production`.
 
-| Capability | Admin | Staff | Customer |
-| --- | --- | --- | --- |
-| Products, plans, taxes, discounts | write | read | read |
-| Quotation templates | write | write | – |
-| Staff management | ✔ | – | – |
-| Customers, subscriptions, invoices | all | all | own records only |
-| Record payments, billing run, reports | ✔ | ✔ | – |
-
-* Passwords must be longer than 8 characters with upper, lower and special
-  characters — checked in one place (`core.security`) and used by every schema.
-* Customer-scoped data is filtered in the query **and** guarded per record, so a
-  portal user cannot read another customer's subscription or invoice by ID.
-* Password reset tokens are random, stored only as SHA-256 hashes, single-use and
-  short-lived. Responses never reveal whether an email exists.
-* Reset links are emailed through `services/email.py`, which logs to the console
-  in dev. Swap in SMTP/SES/Postmark there.
-
-> The scaffold returns the reset token in the response outside production so you
-> can test the flow without a mail server.
-
----
-
-## Tests
+## Tests and checks
 
 ```powershell
-python -m pytest
+.\.venv\Scripts\python.exe -m pytest -q
+npm --prefix frontend run check
+npm --prefix frontend run build
 ```
 
-22 tests cover the parts that are easy to get wrong:
+The backend suite covers authentication, tenant isolation, subscription state
+transitions, invoice generation, billing-run idempotency and catch-up, dry runs,
+discount limits, payments and reporting math. The frontend check runs
+`svelte-check`; the build produces `frontend/build/index.html` plus hashed
+`_app` assets.
 
-* password policy, signup/login, duplicate emails, reset-token single use,
-  user enumeration;
-* invoice generation with taxes, billing-run idempotency, catch-up of missed
-  periods, dry runs;
-* discount auto-application and `max_uses` exhaustion;
-* partial → full payments, overpayment and draft-invoice rejection;
-* the subscription state machine, minimum quantities, variant pricing, renewals,
-  quotation templates;
-* customer tenant isolation and admin-only endpoints;
-* overdue reporting and MRR/ARR math.
+## Project layout
 
----
+```text
+app/
+  main.py                 FastAPI app, lifespan, API and SPA serving
+  core/                   settings, security, money helpers
+  db/                     engine, session, migrations, demo seed
+  models/                 users, products, plans, subscriptions, invoices
+  schemas/                Pydantic request/response models
+  services/               lifecycle, billing, payments, reporting, email
+  api/v1/                 versioned routers
+frontend/
+  src/routes/             SvelteKit pages
+  src/lib/components/     UI components, including RunBillingModal
+  src/lib/data/           backend mappers, API repositories, reactive store
+  build/                  generated static SPA
+tests/                    backend test suite
+scripts/demo.ps1          build + serve demo launcher
+```
 
-## Production checklist
+## Production notes
 
-This is a scaffold, so a few seams are deliberately simple:
-
-1. **Migrations** — replace `create_all` with Alembic before the schema changes
-   in production. `alembic init` + autogenerate against these models is enough.
-2. **Scheduling** — call `run_billing` from a scheduler (APScheduler, cron,
-   Celery beat) once a day; it is idempotent, so retries are safe.
-3. **Email** — implement `send_email` against a real provider.
-4. **PDF** — `/invoices/{id}/print` returns HTML; pipe it through WeasyPrint or a
-   browserless renderer when you need attachments.
-5. **Scale** — SQLite is fine for thousands of subscriptions (WAL, indexed
-   filters, capped pagination). For concurrency beyond a single writer, point
-   `DATABASE_URL` at PostgreSQL; the SQL is portable.
-6. **Hardening** — JWT refresh tokens and revocation, login rate limiting,
-   audit log for admin actions, multi-currency, proration on mid-cycle plan
-   changes, and dunning (retry/reminder schedules).
+- Replace `create_all` with Alembic before production schema changes.
+- Schedule `run_billing` once a day; retries are safe.
+- Implement `services/email.py` against a real email provider.
+- `/invoices/{id}/print` returns HTML; render it to PDF if attachments are
+  needed.
+- SQLite is suitable for a demo and small deployments. Point `DATABASE_URL` at
+  PostgreSQL when you need concurrent writers.
+- Add login rate limiting, refresh-token revocation, audit logging and dunning
+  for a hardened deployment.

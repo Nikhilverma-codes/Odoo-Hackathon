@@ -123,7 +123,7 @@ export function toQuery(params: QueryValue): string {
 export async function getAllPages<T>(path: string, params: QueryValue = {}): Promise<T[]> {
 	const items: T[] = [];
 	let page = 1;
-	let pages = 1;
+	let pages: number;
 
 	do {
 		const query = toQuery({ ...params, page, page_size: 200 });

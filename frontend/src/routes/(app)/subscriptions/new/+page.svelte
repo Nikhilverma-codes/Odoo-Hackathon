@@ -106,8 +106,7 @@
 			toasts.success(`${subscription.number} saved as ${status}.`);
 			await goto(`/subscriptions/${subscription.id}`);
 		} catch (error) {
-			formError =
-				error instanceof Error ? error.message : 'Could not create the subscription.';
+			formError = error instanceof Error ? error.message : 'Could not create the subscription.';
 		} finally {
 			saving = null;
 		}

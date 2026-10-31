@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { auth } from '#lib/auth/auth.svelte';
-	import { homeFor } from '#lib/auth/permissions';
+	import { canAccess, homeFor } from '#lib/auth/permissions';
 	import Button from '#lib/components/ui/Button.svelte';
 	import Icon from '#lib/components/ui/Icon.svelte';
 	import Input from '#lib/components/ui/Input.svelte';
@@ -28,6 +28,16 @@
 		}
 	];
 
+	function safeRedirect(value: string | null): string {
+		const fallback = homeFor(auth.role);
+		if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) {
+			return fallback;
+		}
+		const path = value.split(/[?#]/)[0];
+		if (path === '/' || path === '/login' || !canAccess(path, auth.role)) return fallback;
+		return value;
+	}
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
@@ -40,7 +50,7 @@
 		}
 		toasts.success(`Welcome back, ${result.user?.name.split(' ')[0] ?? 'there'}!`);
 		const redirect = page.url.searchParams.get('redirect');
-		goto(redirect || homeFor(auth.role), { replaceState: true });
+		goto(safeRedirect(redirect), { replaceState: true });
 	}
 
 	function useDemo(account: (typeof demoAccounts)[number]) {

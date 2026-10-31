@@ -1,9 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
 from app import __version__
@@ -19,6 +20,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("brightloop")
 
+FRONTEND_BUILD = settings.frontend_build_path
+FRONTEND_INDEX = FRONTEND_BUILD / "index.html"
+FRONTEND_ASSETS = FRONTEND_BUILD / "_app"
+SERVE_FRONTEND = (
+    settings.serve_frontend and FRONTEND_INDEX.is_file() and FRONTEND_ASSETS.is_dir()
+)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -30,6 +38,12 @@ async def lifespan(_: FastAPI):
         with SessionLocal() as db:
             if seed_demo_data(db):
                 logger.info("Demo data seeded")
+    if settings.serve_frontend and not SERVE_FRONTEND:
+        logger.warning(
+            "Frontend serving is enabled but %s is missing; run `npm run build` "
+            "or set SERVE_FRONTEND=false",
+            FRONTEND_BUILD,
+        )
     yield
 
 
@@ -63,9 +77,18 @@ async def integrity_error_handler(_: Request, exc: IntegrityError) -> JSONRespon
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
+if SERVE_FRONTEND:
+    app.mount(
+        "/_app",
+        StaticFiles(directory=str(FRONTEND_ASSETS)),
+        name="frontend-assets",
+    )
+
 
 @app.get("/", include_in_schema=False)
-def root() -> dict:
+def root():
+    if SERVE_FRONTEND:
+        return FileResponse(FRONTEND_INDEX, headers={"Cache-Control": "no-cache"})
     return {
         "name": settings.app_name,
         "version": __version__,
@@ -78,3 +101,25 @@ def root() -> dict:
 @app.get("/health", tags=["meta"])
 def health() -> dict:
     return {"status": "ok", "environment": settings.environment}
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots() -> FileResponse:
+    path = FRONTEND_BUILD / "robots.txt"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(path)
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def spa_fallback(full_path: str):
+    if not SERVE_FRONTEND:
+        raise HTTPException(status_code=404, detail="Not found")
+    if full_path in {"api", "_app"} or full_path.startswith(("api/", "_app/")):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    candidate = (FRONTEND_BUILD / full_path).resolve()
+    if candidate.is_file() and candidate.is_relative_to(FRONTEND_BUILD.resolve()):
+        return FileResponse(candidate)
+
+    return FileResponse(FRONTEND_INDEX, headers={"Cache-Control": "no-cache"})

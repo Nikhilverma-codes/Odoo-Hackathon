@@ -7,6 +7,7 @@
 	import StatusBadge from '#lib/components/ui/StatusBadge.svelte';
 	import Table from '#lib/components/ui/Table.svelte';
 	import Avatar from '#lib/components/ui/Avatar.svelte';
+	import RunBillingModal from '#lib/components/RunBillingModal.svelte';
 	import { db } from '#lib/data/store.svelte';
 	import {
 		customerById,
@@ -23,6 +24,7 @@
 	let data = $derived(db.data);
 	let summary = $derived(metrics(data));
 	let renewals = $derived(upcomingRenewals(data, 5));
+	let billingOpen = $state(false);
 	let recent = $derived(
 		[...data.invoices].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6)
 	);
@@ -41,6 +43,10 @@
 			<Button variant="outline" href="/payments">
 				<Icon name="credit-card" size={16} />
 				Record payment
+			</Button>
+			<Button variant="outline" onclick={() => (billingOpen = true)}>
+				<Icon name="play" size={16} />
+				Run billing
 			</Button>
 			<Button href="/subscriptions/new">
 				<Icon name="plus" size={16} />
@@ -188,3 +194,5 @@
 		{/each}
 	</div>
 </div>
+
+<RunBillingModal open={billingOpen} onclose={() => (billingOpen = false)} />

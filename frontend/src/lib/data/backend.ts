@@ -358,7 +358,7 @@ const PAYMENT_METHODS: Record<string, PaymentMethod> = {
 	cash: 'cash',
 	paypal: 'bank',
 	direct_debit: 'bank',
-	other: 'bank'
+	other: 'upi'
 };
 
 function taxIdForRate(taxes: Tax[], rate: number | null | undefined): string {
@@ -366,10 +366,7 @@ function taxIdForRate(taxes: Tax[], rate: number | null | undefined): string {
 	return taxes.find((tax) => Math.abs(tax.rate - rate) < 0.0001)?.id ?? '';
 }
 
-function mapSubscription(
-	raw: RawSubscription,
-	taxes: Tax[]
-): Subscription {
+function mapSubscription(raw: RawSubscription, taxes: Tax[]): Subscription {
 	const activeDiscount = raw.discounts.find((link) => link.removed_at === null);
 	const lines: SubscriptionLine[] = raw.lines.map((line) => ({
 		id: sid(line.id),
