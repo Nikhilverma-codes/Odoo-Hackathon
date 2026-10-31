@@ -113,24 +113,34 @@
 			}))
 		};
 
-		if (editing) {
-			await api.products.update(editing.id, payload);
-			toasts.success(`${payload.name} updated.`);
-		} else {
-			await api.products.create(payload);
-			toasts.success(`${payload.name} added to the catalog.`);
+		try {
+			if (editing) {
+				await api.products.update(editing.id, payload);
+				toasts.success(`${payload.name} updated.`);
+			} else {
+				await api.products.create(payload);
+				toasts.success(`${payload.name} added to the catalog.`);
+			}
+			modalOpen = false;
+		} catch (error) {
+			formError = error instanceof Error ? error.message : 'Could not save the product.';
+		} finally {
+			saving = false;
 		}
-		saving = false;
-		modalOpen = false;
 	}
 
 	async function confirmDelete() {
 		if (!deleteTarget) return;
 		deleting = true;
-		await api.products.remove(deleteTarget.id);
-		deleting = false;
-		toasts.success(`${deleteTarget.name} deleted.`);
-		deleteTarget = null;
+		try {
+			await api.products.remove(deleteTarget.id);
+			toasts.success(`${deleteTarget.name} deleted.`);
+			deleteTarget = null;
+		} catch (error) {
+			toasts.error(error instanceof Error ? error.message : 'Could not delete the product.');
+		} finally {
+			deleting = false;
+		}
 	}
 </script>
 

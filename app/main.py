@@ -11,7 +11,7 @@ from app.api.v1.router import api_router  # importing the API registers every mo
 from app.core.config import settings
 from app.db.base import Base
 from app.db.seed import seed_demo_data
-from app.db.session import SessionLocal, engine
+from app.db.session import SessionLocal, engine, ensure_lightweight_migrations
 
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
@@ -25,6 +25,7 @@ async def lifespan(_: FastAPI):
     # SQLite + create_all is all a scaffold needs; switch to Alembic before
     # the first production deploy.
     Base.metadata.create_all(bind=engine)
+    ensure_lightweight_migrations()
     if settings.seed_demo_data:
         with SessionLocal() as db:
             if seed_demo_data(db):

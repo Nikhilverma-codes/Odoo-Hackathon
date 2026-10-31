@@ -30,9 +30,9 @@
 			: []
 	);
 
-	function toggle(subscription: Subscription) {
+	async function toggle(subscription: Subscription) {
 		const next = subscription.status === 'paused' ? 'active' : 'paused';
-		const result = setSubscriptionStatus(subscription.id, next);
+		const result = await setSubscriptionStatus(subscription.id, next);
 		if (!result.ok) {
 			toasts.error(result.error ?? 'Could not update this service.');
 			return;

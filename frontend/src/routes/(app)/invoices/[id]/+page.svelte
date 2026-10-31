@@ -34,9 +34,11 @@
 	let cancelOpen = $state(false);
 	let working = $state(false);
 
-	function confirm() {
+	async function confirm() {
 		if (!invoice) return;
-		const result = confirmInvoice(invoice.id);
+		working = true;
+		const result = await confirmInvoice(invoice.id);
+		working = false;
 		if (!result.ok) {
 			toasts.error(result.error ?? 'Could not confirm the invoice.');
 			return;
@@ -44,10 +46,10 @@
 		toasts.success(`${invoice.number} confirmed.`);
 	}
 
-	function cancel() {
+	async function cancel() {
 		if (!invoice) return;
 		working = true;
-		const result = cancelInvoice(invoice.id);
+		const result = await cancelInvoice(invoice.id);
 		working = false;
 		cancelOpen = false;
 		if (!result.ok) {

@@ -16,6 +16,7 @@ class CustomerShort(Schema):
 
 
 class CustomerOut(CustomerShort):
+    contact_name: str | None
     phone: str | None
     billing_address: str | None
     tax_id: str | None
@@ -25,6 +26,7 @@ class CustomerOut(CustomerShort):
 
 class CustomerCreateIn(Schema):
     name: str = Field(min_length=1, max_length=160)
+    contact_name: str | None = Field(default=None, max_length=160)
     email: EmailStr
     phone: str | None = Field(default=None, max_length=40)
     billing_address: str | None = None
@@ -39,6 +41,8 @@ class CustomerCreateIn(Schema):
 
 class CustomerUpdateIn(Schema):
     name: str | None = Field(default=None, min_length=1, max_length=160)
+    contact_name: str | None = Field(default=None, max_length=160)
+    email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=40)
     billing_address: str | None = None
     tax_id: str | None = Field(default=None, max_length=60)

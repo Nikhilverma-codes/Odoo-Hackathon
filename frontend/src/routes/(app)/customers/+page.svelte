@@ -112,15 +112,20 @@
 			since: form.since
 		};
 
-		if (editing) {
-			await api.customers.update(editing.id, payload);
-			toasts.success(`${payload.company} updated.`);
-		} else {
-			await api.customers.create(payload);
-			toasts.success(`${payload.company} added.`);
+		try {
+			if (editing) {
+				await api.customers.update(editing.id, payload);
+				toasts.success(`${payload.company} updated.`);
+			} else {
+				await api.customers.create(payload);
+				toasts.success(`${payload.company} added.`);
+			}
+			modalOpen = false;
+		} catch (error) {
+			formError = error instanceof Error ? error.message : 'Could not save the customer.';
+		} finally {
+			saving = false;
 		}
-		saving = false;
-		modalOpen = false;
 	}
 </script>
 

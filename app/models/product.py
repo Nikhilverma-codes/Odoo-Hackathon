@@ -16,6 +16,7 @@ class ProductType(str, PyEnum):
     ADDON = "addon"
     MODULE = "module"
     SUPPORT = "support"
+    HARDWARE = "hardware"
 
 
 class Tax(Base, TimestampMixin):

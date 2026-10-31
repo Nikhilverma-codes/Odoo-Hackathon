@@ -29,6 +29,7 @@ class Customer(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    contact_name: Mapped[str | None] = mapped_column(String(160))
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     phone: Mapped[str | None] = mapped_column(String(40))
     billing_address: Mapped[str | None] = mapped_column(Text)

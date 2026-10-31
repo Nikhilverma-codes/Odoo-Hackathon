@@ -46,6 +46,7 @@ def create_customer(payload: CustomerCreateIn, staff: StaffUser, db: DbSession):
 
     customer = Customer(
         name=payload.name,
+        contact_name=payload.contact_name,
         email=email,
         phone=payload.phone,
         billing_address=payload.billing_address,
@@ -96,7 +97,19 @@ def update_customer(
     customer = db.get(Customer, customer_id)
     if not customer:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Customer not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+
+    data = payload.model_dump(exclude_unset=True)
+    if "email" in data:
+        email = str(data["email"]).lower()
+        if db.scalar(
+            select(Customer.id).where(Customer.email == email, Customer.id != customer.id)
+        ):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "A customer with this email already exists"
+            )
+        data["email"] = email
+
+    for field, value in data.items():
         setattr(customer, field, value)
     db.add(customer)
     db.commit()

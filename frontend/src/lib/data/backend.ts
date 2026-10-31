@@ -66,7 +66,7 @@ interface RawVariant {
 	is_active: boolean;
 }
 
-interface RawProduct {
+export interface RawProduct {
 	id: number;
 	name: string;
 	type: string;
@@ -77,8 +77,9 @@ interface RawProduct {
 	variants: RawVariant[];
 }
 
-interface RawPlan {
+export interface RawPlan {
 	id: number;
+	code: string;
 	name: string;
 	product: { id: number } | null;
 	price: number;
@@ -93,9 +94,10 @@ interface RawPlan {
 	is_active: boolean;
 }
 
-interface RawCustomer {
+export interface RawCustomer {
 	id: number;
 	name: string;
+	contact_name: string | null;
 	email: string;
 	phone: string | null;
 	billing_address: string | null;
@@ -232,6 +234,21 @@ function mapTax(raw: RawTax): Tax {
 	};
 }
 
+export const PRODUCT_TYPE_FROM_BACKEND: Record<string, string> = {
+	module: 'Software',
+	addon: 'Add-on',
+	service: 'Service',
+	support: 'Service',
+	hardware: 'Hardware'
+};
+
+export const PRODUCT_TYPE_TO_BACKEND: Record<string, string> = {
+	Software: 'module',
+	'Add-on': 'addon',
+	Service: 'service',
+	Hardware: 'hardware'
+};
+
 function mapVariant(raw: RawVariant): ProductVariant {
 	return {
 		id: sid(raw.id),
@@ -244,18 +261,19 @@ function mapProduct(raw: RawProduct): Product {
 	return {
 		id: sid(raw.id),
 		name: raw.name,
-		type: raw.type,
+		type: PRODUCT_TYPE_FROM_BACKEND[raw.type] ?? raw.type,
 		salesPrice: raw.sales_price,
 		costPrice: raw.cost_price,
 		notes: raw.notes ?? '',
 		active: raw.is_active,
-		variants: raw.variants.map(mapVariant)
+		variants: raw.variants.filter((variant) => variant.is_active).map(mapVariant)
 	};
 }
 
 function mapPlan(raw: RawPlan): Plan {
 	return {
 		id: sid(raw.id),
+		code: raw.code,
 		name: raw.name,
 		productId: sid(raw.product?.id),
 		price: raw.price,
@@ -274,7 +292,7 @@ function mapPlan(raw: RawPlan): Plan {
 function mapCustomer(raw: RawCustomer): Customer {
 	return {
 		id: sid(raw.id),
-		name: raw.name,
+		name: raw.contact_name ?? raw.name,
 		company: raw.name,
 		email: raw.email,
 		phone: raw.phone ?? '',

@@ -77,7 +77,7 @@
 		return null;
 	}
 
-	function submit(status: Extract<SubscriptionStatus, 'draft' | 'quotation'>) {
+	async function submit(status: Extract<SubscriptionStatus, 'draft' | 'quotation'>) {
 		formError = validate() ?? '';
 		if (formError || !plan) return;
 
@@ -91,20 +91,26 @@
 			taxId: defaultTaxId
 		};
 
-		const subscription = createSubscription({
-			customerId,
-			planId,
-			startDate,
-			endDate,
-			paymentTerms,
-			status,
-			discountId: null,
-			notes,
-			lines: [line]
-		});
-		saving = null;
-		toasts.success(`${subscription.number} saved as ${status}.`);
-		goto(`/subscriptions/${subscription.id}`);
+		try {
+			const subscription = await createSubscription({
+				customerId,
+				planId,
+				startDate,
+				endDate,
+				paymentTerms,
+				status,
+				discountId: null,
+				notes,
+				lines: [line]
+			});
+			toasts.success(`${subscription.number} saved as ${status}.`);
+			await goto(`/subscriptions/${subscription.id}`);
+		} catch (error) {
+			formError =
+				error instanceof Error ? error.message : 'Could not create the subscription.';
+		} finally {
+			saving = null;
+		}
 	}
 </script>
 

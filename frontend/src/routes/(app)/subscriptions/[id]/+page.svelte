@@ -60,9 +60,9 @@
 
 	let closeOpen = $state(false);
 
-	function changeStatus(status: SubscriptionStatus) {
+	async function changeStatus(status: SubscriptionStatus) {
 		if (!subscription) return;
-		const result = setSubscriptionStatus(subscription.id, status);
+		const result = await setSubscriptionStatus(subscription.id, status);
 		if (!result.ok) {
 			toasts.error(result.error ?? 'Could not update the subscription.');
 			return;
@@ -71,25 +71,26 @@
 		closeOpen = false;
 	}
 
-	function renew() {
+	async function renew() {
 		if (!subscription) return;
-		const result = renewSubscription(subscription.id);
+		const result = await renewSubscription(subscription.id);
 		if (!result.ok) {
 			toasts.error(result.error ?? 'Could not renew the subscription.');
 			return;
 		}
-		toasts.success(`Renewed until ${formatDate(subscription.endDate)}.`);
+		const end = result.subscription?.endDate;
+		toasts.success(end ? `Renewed until ${formatDate(end)}.` : 'Subscription renewed.');
 	}
 
-	function createInvoice() {
+	async function createInvoice() {
 		if (!subscription) return;
-		const result = generateInvoice(subscription.id);
+		const result = await generateInvoice(subscription.id);
 		if (!result.ok) {
-			toasts.error(result.error ?? 'Could not generate an invoice.');
+			toasts.error(result.error);
 			return;
 		}
 		toasts.success(`${result.invoice.number} created as a draft.`);
-		goto(`/invoices/${result.invoice.id}`);
+		await goto(`/invoices/${result.invoice.id}`);
 	}
 
 	function productLabel(productId: string, variantId: string | null): string {
@@ -128,10 +129,6 @@
 					<Button onclick={() => changeStatus('active')}>
 						<Icon name="play" size={16} />
 						Activate
-					</Button>
-					<Button variant="outline" onclick={createInvoice}>
-						<Icon name="receipt" size={16} />
-						Invoice
 					</Button>
 				{:else if subscription.status === 'active'}
 					<Button onclick={createInvoice}>
@@ -359,7 +356,7 @@
 					<h2 class="text-sm font-semibold text-slate-900">Invoices</h2>
 					<p class="text-xs text-slate-400">Billing generated from this subscription</p>
 				</div>
-				{#if subscription.status === 'active' || subscription.status === 'confirmed'}
+				{#if subscription.status === 'active'}
 					<Button variant="outline" size="sm" onclick={createInvoice}>
 						<Icon name="plus" size={14} />
 						New invoice

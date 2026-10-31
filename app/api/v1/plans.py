@@ -78,6 +78,8 @@ def update_plan(plan_id: int, payload: PlanUpdateIn, admin: AdminUser, db: DbSes
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Plan not found")
     if payload.tax_id is not None and not db.get(Tax, payload.tax_id):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tax not found")
+    if payload.product_id is not None and not db.get(Product, payload.product_id):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Product not found")
 
     data = payload.model_dump(exclude_unset=True)
     for field, value in data.items():

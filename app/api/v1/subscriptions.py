@@ -145,11 +145,13 @@ def activate_subscription(
 
 @router.post("/{subscription_id}/pause", response_model=SubscriptionOut)
 def pause_subscription(
-    subscription_id: int, staff: StaffUser, db: DbSession, note: str | None = None
+    subscription_id: int, user: CurrentUser, db: DbSession, note: str | None = None
 ):
-    subscription = subscription_service.get_subscription(db, subscription_id)
+    subscription = _get_visible(db, subscription_id, user)
+    if user.role is Role.CUSTOMER and not subscription.allow_pause:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This plan cannot be paused")
     subscription = subscription_service.transition(
-        db, subscription, SubscriptionStatus.PAUSED, staff, note
+        db, subscription, SubscriptionStatus.PAUSED, user, note
     )
     db.commit()
     return subscription
@@ -157,11 +159,11 @@ def pause_subscription(
 
 @router.post("/{subscription_id}/resume", response_model=SubscriptionOut)
 def resume_subscription(
-    subscription_id: int, staff: StaffUser, db: DbSession, note: str | None = None
+    subscription_id: int, user: CurrentUser, db: DbSession, note: str | None = None
 ):
-    subscription = subscription_service.get_subscription(db, subscription_id)
+    subscription = _get_visible(db, subscription_id, user)
     subscription = subscription_service.transition(
-        db, subscription, SubscriptionStatus.ACTIVE, staff, note or "Resumed"
+        db, subscription, SubscriptionStatus.ACTIVE, user, note or "Resumed"
     )
     db.commit()
     return subscription

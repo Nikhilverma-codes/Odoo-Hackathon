@@ -69,7 +69,7 @@
 		amount = target ? invoiceBalance(target) : 0;
 	}
 
-	function submit() {
+	async function submit() {
 		error = '';
 		if (!invoiceId) {
 			error = 'Choose an invoice to pay.';
@@ -85,7 +85,7 @@
 		}
 
 		saving = true;
-		const result = recordPayment({
+		const result = await recordPayment({
 			invoiceId,
 			amount,
 			method,

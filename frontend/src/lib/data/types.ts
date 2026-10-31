@@ -43,6 +43,7 @@ export interface Product {
 
 export interface Plan {
 	id: string;
+	code?: string;
 	name: string;
 	productId: string;
 	price: number;

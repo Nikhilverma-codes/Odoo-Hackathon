@@ -115,24 +115,34 @@
 			active: form.active
 		};
 
-		if (editing) {
-			await api.plans.update(editing.id, payload);
-			toasts.success(`${payload.name} updated.`);
-		} else {
-			await api.plans.create(payload);
-			toasts.success(`${payload.name} created.`);
+		try {
+			if (editing) {
+				await api.plans.update(editing.id, payload);
+				toasts.success(`${payload.name} updated.`);
+			} else {
+				await api.plans.create(payload);
+				toasts.success(`${payload.name} created.`);
+			}
+			modalOpen = false;
+		} catch (error) {
+			formError = error instanceof Error ? error.message : 'Could not save the plan.';
+		} finally {
+			saving = false;
 		}
-		saving = false;
-		modalOpen = false;
 	}
 
 	async function confirmDelete() {
 		if (!deleteTarget) return;
 		deleting = true;
-		await api.plans.remove(deleteTarget.id);
-		deleting = false;
-		toasts.success(`${deleteTarget.name} deleted.`);
-		deleteTarget = null;
+		try {
+			await api.plans.remove(deleteTarget.id);
+			toasts.success(`${deleteTarget.name} deleted.`);
+			deleteTarget = null;
+		} catch (error) {
+			toasts.error(error instanceof Error ? error.message : 'Could not delete the plan.');
+		} finally {
+			deleting = false;
+		}
 	}
 </script>
 

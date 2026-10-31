@@ -36,6 +36,7 @@ class PlanIn(Schema):
 
 class PlanUpdateIn(Schema):
     name: str | None = Field(default=None, min_length=1, max_length=160)
+    product_id: int | None = None
     price: Money | None = Field(default=None, ge=0)
     interval: BillingInterval | None = None
     min_quantity: int | None = Field(default=None, ge=1)
