@@ -4,6 +4,15 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	server: {
+		// The dev server talks to the FastAPI backend on :8000 without CORS.
+		proxy: {
+			'/api': {
+				target: 'http://127.0.0.1:8000',
+				changeOrigin: true
+			}
+		}
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit({

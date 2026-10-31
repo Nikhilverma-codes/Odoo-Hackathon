@@ -17,22 +17,22 @@
 		{
 			role: 'Admin',
 			email: 'admin@brightloop.io',
-			password: 'Admin@123',
+			password: 'Admin@1234',
 			detail: 'Full system access'
 		},
 		{
 			role: 'Customer',
-			email: 'priya@nimbus.co',
-			password: 'Customer@123',
+			email: 'billing@acme-retail.com',
+			password: 'Customer@1234',
 			detail: 'View your services and invoices'
 		}
 	];
 
-	function submit(event: SubmitEvent) {
+	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
 		loading = true;
-		const result = auth.login(email, password);
+		const result = await auth.login(email, password);
 		loading = false;
 		if (!result.ok) {
 			error = result.error ?? 'Unable to sign in.';

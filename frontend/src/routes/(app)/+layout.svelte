@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { auth } from '#lib/auth/auth.svelte';
@@ -10,9 +11,15 @@
 
 	let pathname = $derived(page.url.pathname);
 	let user = $derived(auth.user);
-	let allowed = $derived(!!user && canAccess(pathname, auth.role));
+	let ready = $derived(auth.ready);
+	let allowed = $derived(!!user && ready && canAccess(pathname, auth.role));
+
+	onMount(() => {
+		void auth.initialize();
+	});
 
 	$effect(() => {
+		if (!ready) return;
 		if (!user) {
 			goto(`/login?redirect=${encodeURIComponent(pathname)}`, { replaceState: true });
 			return;
