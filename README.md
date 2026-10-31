@@ -1,5 +1,7 @@
 # Brightloop
 
+# VERCEL DEPLOYMENT:- https://odoo-hackathon-1hjr.vercel.app/
+
 Brightloop is a full-stack subscription billing system built for the Odoo
 hackathon brief. It covers the catalogue, plans, quotation templates,
 subscription lifecycle, recurring invoices, taxes, discounts, payments, finance
