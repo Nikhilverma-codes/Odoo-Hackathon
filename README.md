@@ -8,9 +8,6 @@ SQLite**.
 The domain model follows the four scenes in the brief (signup, launching a plan,
 billing day, discounts/payments/reporting) rather than a generic CRUD skeleton.
 
-Architecture diagrams (layers, request flow, ER model, subscription state
-machine, billing run): [docs/architecture.md](docs/architecture.md).
-
 ---
 
 ## Quickstart
